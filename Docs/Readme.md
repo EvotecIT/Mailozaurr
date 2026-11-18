@@ -113,6 +113,8 @@ Converts a supported mail store into a new Unicode PST.
 
 Converts PST, supported PST-compatible OST, OLM, Mbox, EMLX, EML, Maildir, Apple Mail, or EML directory sources through OfficeIMO.Email. The source is never modified and semantic verification is enabled by default.
 
+SplitSizeMB writes numbered parts (name.part001.pst, name.part002.pst, ...) of at most that estimated size instead of one PST, in received-time order. Every part is verified against the source before it is committed, and an EmailStorePstSplitReport is returned. DisplayName and SkipVerification do not apply to a split.
+
 ### [ConvertTo-OAuth2Credential](ConvertTo-OAuth2Credential.md)
 Creates a PSCredential object for OAuth2 authentication from a username and token.
 
@@ -144,6 +146,9 @@ The Disconnect-IMAP cmdlet disconnects an active MailKit IMAP client session. Pa
 Disconnects an active POP3 connection previously established with Connect-POP3.
 
 The Disconnect-POP3 cmdlet disconnects an active MailKit POP3 client session. Pass the PopConnectionInfo object returned by Connect-POP3 to this cmdlet to safely close the connection and release resources.
+
+### [Export-GraphMailboxToPst](Export-GraphMailboxToPst.md)
+Exports an Exchange Online mailbox to one or more PST files through Microsoft Graph.
 
 ### [Export-MailFile](Export-MailFile.md)
 Exports messages as EML, MSG, OFT, TNEF, or local HTML copies.

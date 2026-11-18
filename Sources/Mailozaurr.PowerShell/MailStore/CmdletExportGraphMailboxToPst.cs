@@ -1,0 +1,260 @@
+using Mailozaurr.MailboxExport;
+using OfficeIMO.Email.Store;
+
+namespace Mailozaurr.PowerShell;
+
+/// <summary>
+/// <para type="synopsis">Exports an Exchange Online mailbox to one or more PST files through Microsoft Graph.</para>
+/// </summary>
+/// <remarks>
+/// <para type="description">Reads the mailbox folder tree through Microsoft Graph and streams each message's MIME content straight into a new Unicode PST written by OfficeIMO.Email. The folder hierarchy is kept, and Inbox, Sent Items, Drafts, Junk Email and Outbox keep their Outlook roles. The mailbox is only read; nothing in it is changed.</para>
+/// <para type="description">SplitSizeMB uses an estimated size to start a new numbered part (name.part001.pst, name.part002.pst, ...). Actual PST sizes can differ, and a part can contain a single item larger than the estimate. By default, the exporter reopens each part and checks its item count. -SkipVerification skips that check. The report always includes each part's size and SHA-256 hash.</para>
+/// <para type="description">Mail is always exported. IncludeContacts, IncludeCalendar and IncludeTasks add contacts, calendar events and Microsoft To Do tasks as typed Outlook items.</para>
+/// <para type="description">The exporter preserves calendar recurrence patterns it can map. If a recurrence pattern is incomplete or unsupported, the PST contains the first occurrence and the report marks the item as partial. Calendar and task attachments, modified and cancelled occurrences of a calendar series, and task recurrence are omitted and reported as partial items.</para>
+/// <para type="description">By default the export keeps a checkpoint next to the output. To continue, add -Resume and keep the original mailbox, destination, split size, filters and item options. If the export stopped at -MaxParts, increase that limit when resuming from a valid checkpoint. The exporter checks each completed part against its stored SHA-256 hash before continuing. Use -NoCheckpoint to turn checkpoints off.</para>
+/// <para type="description">For app-only access through unscoped Microsoft Entra consent, grant Mail.Read for mail, Contacts.Read for IncludeContacts and Calendars.Read for IncludeCalendar. These grants cover every mailbox in the tenant unless an Exchange Application Access Policy scopes them.</para>
+/// <para type="description">For app-only access to selected mailboxes through Exchange Online Application RBAC, assign the corresponding scoped Application Mail.Read, Application Contacts.Read and Application Calendars.Read roles. Remove overlapping unscoped Microsoft Entra grants. Exchange RBAC and Microsoft Entra permissions are additive. IncludeTasks requires the separate Microsoft Graph application permission Tasks.Read.All because Exchange mailbox scopes do not cover Microsoft To Do.</para>
+/// <para type="description">Delegated access to the signed-in user's own mailbox uses Mail.Read, Contacts.Read, Calendars.Read and Tasks.Read as needed. For a shared mailbox the signed-in user can open, use Mail.Read.Shared, Contacts.Read.Shared and Calendars.Read.Shared. Reading another user's Microsoft To Do tasks requires app-only access.</para>
+/// <para type="description">The PST writer creates its own Deleted Items folder, so the mailbox's Deleted Items is written as a separate folder with the same name.</para>
+/// </remarks>
+/// <example>
+///   <summary>Export a mailbox to PST parts with a 5 GiB target size</summary>
+///   <code>Connect-EmailGraph -ClientId $clientId -CertificatePath './app.pfx' -CertificatePassword $pfxPassword -DirectoryId $tenantId
+/// Export-GraphMailboxToPst -Identity 'user@contoso.com' -OutputPath 'C:\Export' -SplitSizeMB 5120</code>
+///   <para>Writes C:\Export\user@contoso.com.part001.pst, part002.pst and so on, and returns the export report.</para>
+/// </example>
+/// <example>
+///   <summary>Export last year's Inbox and Sent Items with contacts and calendar</summary>
+///   <code>Export-GraphMailboxToPst -Identity 'user@contoso.com' -OutputPath 'C:\Export\user-2025.pst' -IncludeFolder 'Inbox', 'Sent Items', 'Contacts', 'Calendar' -StartDate '2025-01-01' -EndDate '2026-01-01' -IncludeContacts -IncludeCalendar</code>
+///   <para>IncludeFolder patterns match paths such as Inbox\Projects and include the folder's subfolders. Use the actual mailbox folder and calendar names if they differ from the example.</para>
+/// </example>
+/// <example>
+///   <summary>Continue an interrupted export</summary>
+///   <code>Export-GraphMailboxToPst -Identity 'user@contoso.com' -OutputPath 'C:\Export' -SplitSizeMB 5120 -Resume</code>
+///   <para>Keep the original mailbox, destination, split size, filters and item options. If the export reached its part limit, add a higher -MaxParts value.</para>
+/// </example>
+[Cmdlet(VerbsData.Export, "GraphMailboxToPst", SupportsShouldProcess = true)]
+[OutputType(typeof(GraphMailboxPstExportReport))]
+public sealed class CmdletExportGraphMailboxToPst : MailStoreCmdletBase {
+    private static readonly TimeSpan ProgressInterval = TimeSpan.FromMilliseconds(250);
+
+    /// <summary>User principal name, SMTP address or object id of the mailbox to export.</summary>
+    [Parameter(Mandatory = true, Position = 0)]
+    [Alias("UserPrincipalName", "Mailbox")]
+    [ValidateNotNullOrEmpty]
+    public string? Identity { get; set; }
+
+    /// <summary>Destination PST file, or a directory in which the PST is named after the mailbox.</summary>
+    [Parameter(Mandatory = true, Position = 1)]
+    [Alias("Path", "DestinationPath")]
+    [ValidateNotNullOrEmpty]
+    public string? OutputPath { get; set; }
+
+    /// <summary>Estimated size of a PST part in MiB. Actual sizes can exceed the estimate, including when one item exceeds it. Omit this parameter to write a single PST.</summary>
+    [Parameter]
+    [ValidateRange(1, 1_000_000)]
+    public int SplitSizeMB { get; set; }
+
+    /// <summary>Largest number of parts. If the export needs more, raise this limit when resuming from a valid checkpoint.</summary>
+    [Parameter]
+    [ValidateRange(1, 10_000)]
+    public int MaxParts { get; set; } = 1000;
+
+    /// <summary>Folder path patterns to export, such as 'Inbox' or 'Inbox\Projects*'. Patterns apply to mail, contacts, calendars and task lists. A matching folder's subfolders are included.</summary>
+    [Parameter]
+    [SupportsWildcards]
+    public string[]? IncludeFolder { get; set; }
+
+    /// <summary>Folder path patterns to leave out, such as 'Deleted Items' or 'Junk Email'. Patterns apply to mail, contacts, calendars and task lists. A matching folder's subfolders are left out too.</summary>
+    [Parameter]
+    [SupportsWildcards]
+    public string[]? ExcludeFolder { get; set; }
+
+    /// <summary>Exports messages received on or after this time, and events that end on or after it.</summary>
+    [Parameter]
+    public DateTime? StartDate { get; set; }
+
+    /// <summary>Exports messages received before this time, and events that start before it.</summary>
+    [Parameter]
+    public DateTime? EndDate { get; set; }
+
+    /// <summary>Adds the default contacts folder and its subfolders.</summary>
+    [Parameter]
+    public SwitchParameter IncludeContacts { get; set; }
+
+    /// <summary>Adds every calendar in the mailbox.</summary>
+    [Parameter]
+    public SwitchParameter IncludeCalendar { get; set; }
+
+    /// <summary>Adds Microsoft To Do task lists.</summary>
+    [Parameter]
+    public SwitchParameter IncludeTasks { get; set; }
+
+    /// <summary>Largest message downloaded, in megabytes. Larger messages are skipped and listed in the report.</summary>
+    [Parameter]
+    [ValidateRange(1, 2047)]
+    public int MaxItemSizeMB { get; set; } = 150;
+
+    /// <summary>PST display name shown in Outlook. Defaults to the mailbox identity.</summary>
+    [Parameter]
+    public string? DisplayName { get; set; }
+
+    /// <summary>Continues an interrupted export from its checkpoint.</summary>
+    [Parameter]
+    public SwitchParameter Resume { get; set; }
+
+    /// <summary>Checkpoint file. Defaults to name.checkpoint next to the output.</summary>
+    [Parameter]
+    public string? CheckpointPath { get; set; }
+
+    /// <summary>Turns off checkpoints, so an interrupted export cannot be resumed.</summary>
+    [Parameter]
+    public SwitchParameter NoCheckpoint { get; set; }
+
+    /// <summary>Replaces existing PST files and discards an existing checkpoint.</summary>
+    [Parameter]
+    public SwitchParameter Force { get; set; }
+
+    /// <summary>Stops at the first item that cannot be read or written instead of listing it in the report.</summary>
+    [Parameter]
+    public SwitchParameter StopOnItemError { get; set; }
+
+    /// <summary>Skips reopening each part to check its item count. The SHA-256 hash is still calculated.</summary>
+    [Parameter]
+    public SwitchParameter SkipVerification { get; set; }
+
+    /// <summary>Graph connection from Connect-EmailGraph. Defaults to the current session.</summary>
+    [Parameter]
+    [ValidateNotNull]
+    public GraphConnectionInfo? Connection { get; set; }
+
+    /// <summary>Runs the export.</summary>
+    protected override async Task ProcessRecordAsync() {
+        string identity = Identity!;
+        GraphConnectionInfo? connection = Connection ?? DefaultSessions.GraphSession;
+        if (connection == null) {
+            WriteWarning("Export-GraphMailboxToPst - Connection not provided and no default session available.");
+            return;
+        }
+        string destination = ResolveDestination(identity);
+        if (!ShouldProcess(destination, $"Export mailbox '{identity}' to PST")) return;
+
+        var source = new GraphMailboxExportSource(connection.Credential, identity);
+
+        GraphMailboxPstExportOptions options = BuildOptions(identity, destination);
+        var progress = new ThrottledProgress(this, identity);
+        options.Progress = progress;
+        try {
+            GraphMailboxPstExportReport report = await new GraphMailboxPstExporter(source, options)
+                .ExportAsync(CancelToken).ConfigureAwait(false);
+            progress.Complete();
+            foreach (GraphMailboxExportIssue issue in report.Issues) {
+                string message = $"{issue.Kind} {issue.ItemType} '{issue.Subject ?? issue.ItemId}' in '{issue.FolderPath}': {issue.Message}";
+                if (issue.Kind == GraphMailboxExportIssueKind.Failed) WriteWarning(message);
+                else WriteVerbose(message);
+            }
+            WriteStoreDiagnostics(report.NativeDiagnostics, destination);
+            foreach (GraphMailboxPstExportPart part in report.Parts.Where(part => part.Verified == false)) {
+                WriteError(new ErrorRecord(
+                    new InvalidDataException($"PST part '{part.Path}' contains {part.VerifiedItemCount} items; {part.ItemCount} were written."),
+                    "MailboxPstPartVerificationFailed",
+                    ErrorCategory.InvalidData,
+                    part.Path));
+            }
+            WriteObject(report);
+        } catch (OperationCanceledException) when (CancelToken.IsCancellationRequested) {
+            progress.Complete();
+            throw;
+        } catch (Exception exception) {
+            progress.Complete();
+            string hint = options.CheckpointPath != null && File.Exists(options.CheckpointPath)
+                ? " Use -Resume to continue from the checkpoint."
+                : string.Empty;
+            WriteError(new ErrorRecord(
+                new InvalidOperationException(exception.Message + hint, exception),
+                "MailboxPstExportFailed",
+                ErrorCategory.WriteError,
+                destination));
+        }
+    }
+
+    private string ResolveDestination(string identity) {
+        string path = GetUnresolvedProviderPathFromPSPath(OutputPath!);
+        bool isFile = path.EndsWith(".pst", StringComparison.OrdinalIgnoreCase) && !Directory.Exists(path);
+        if (isFile) return path;
+        return Path.Combine(path, SanitizeFileName(identity) + ".pst");
+    }
+
+    internal static string SanitizeFileName(string value) {
+        char[] invalid = Path.GetInvalidFileNameChars();
+        var builder = new System.Text.StringBuilder(value.Length);
+        foreach (char character in value) builder.Append(Array.IndexOf(invalid, character) >= 0 ? '_' : character);
+        return builder.ToString().Trim();
+    }
+
+    private GraphMailboxPstExportOptions BuildOptions(string identity, string destination) {
+        GraphMailboxExportItemTypes types = GraphMailboxExportItemTypes.Mail;
+        if (IncludeContacts.IsPresent) types |= GraphMailboxExportItemTypes.Contacts;
+        if (IncludeCalendar.IsPresent) types |= GraphMailboxExportItemTypes.Calendar;
+        if (IncludeTasks.IsPresent) types |= GraphMailboxExportItemTypes.Tasks;
+        string? checkpoint = NoCheckpoint.IsPresent
+            ? null
+            : CheckpointPath != null
+                ? GetUnresolvedProviderPathFromPSPath(CheckpointPath)
+                : Path.ChangeExtension(destination, ".checkpoint");
+        var options = new GraphMailboxPstExportOptions {
+            Mailbox = identity,
+            DestinationPath = destination,
+            Split = SplitSizeMB > 0
+                ? new EmailStorePstSplitOptions(maxEstimatedBytesPerPart: SplitSizeMB * 1024L * 1024L, maxParts: MaxParts)
+                : null,
+            ItemTypes = types,
+            StartDate = ToOffset(StartDate),
+            EndDate = ToOffset(EndDate),
+            MaxItemBytes = MaxItemSizeMB * 1024L * 1024L,
+            DisplayName = DisplayName,
+            Overwrite = Force.IsPresent,
+            CheckpointPath = checkpoint,
+            Resume = Resume.IsPresent,
+            Verify = !SkipVerification.IsPresent,
+            StopOnItemError = StopOnItemError.IsPresent
+        };
+        foreach (string pattern in IncludeFolder ?? Array.Empty<string>()) options.IncludeFolders.Add(pattern);
+        foreach (string pattern in ExcludeFolder ?? Array.Empty<string>()) options.ExcludeFolders.Add(pattern);
+        return options;
+    }
+
+    private static DateTimeOffset? ToOffset(DateTime? value) {
+        if (!value.HasValue) return null;
+        DateTime date = value.Value;
+        return date.Kind == DateTimeKind.Utc ? new DateTimeOffset(date) : new DateTimeOffset(DateTime.SpecifyKind(date, DateTimeKind.Local));
+    }
+
+    private sealed class ThrottledProgress : IProgress<GraphMailboxPstExportProgress> {
+        private readonly CmdletExportGraphMailboxToPst _cmdlet;
+        private readonly ProgressRecord _record;
+        private DateTime _lastWrite = DateTime.MinValue;
+
+        internal ThrottledProgress(CmdletExportGraphMailboxToPst cmdlet, string identity) {
+            _cmdlet = cmdlet;
+            _record = new ProgressRecord(1, $"Exporting {identity} to PST", "Reading folders");
+        }
+
+        public void Report(GraphMailboxPstExportProgress value) {
+            DateTime now = DateTime.UtcNow;
+            if (now - _lastWrite < ProgressInterval) return;
+            _lastWrite = now;
+            _record.StatusDescription =
+                $"{value.FolderPath}: {value.ItemsWritten} written, {value.ItemsSkipped} skipped, {value.ItemsFailed} failed (part {value.PartNumber}, ~{value.PartEstimatedBytes / (1024 * 1024)} MB)";
+            _record.PercentComplete = value.ItemsExpected is long expected && expected > 0
+                ? (int)Math.Min(99, 100L * (value.ItemsWritten + value.ItemsSkipped + value.ItemsFailed) / expected)
+                : -1;
+            _cmdlet.WriteProgress(_record);
+        }
+
+        internal void Complete() {
+            _record.RecordType = ProgressRecordType.Completed;
+            _cmdlet.WriteProgress(_record);
+        }
+    }
+}

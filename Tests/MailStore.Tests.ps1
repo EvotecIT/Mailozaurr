@@ -64,6 +64,7 @@ Describe 'OfficeIMO.Email mail-store workflows' {
             'Test-MailStore'
             'Export-MailStore'
             'ConvertTo-MailPst'
+            'Export-GraphMailboxToPst'
             'Merge-MailStore'
         )
 
@@ -98,6 +99,37 @@ Describe 'OfficeIMO.Email mail-store workflows' {
         $verifiedPath | Should -Exist
         $report.Verification.IsSuccessful | Should -BeTrue
         $report.Verification.MatchedItems | Should -Be 2
+    }
+
+    It 'splits a store into verified size-limited PST parts that read back completely' {
+        $largeSource = Join-Path $TestDrive 'large-source'
+        New-Item -ItemType Directory -Path $largeSource | Out-Null
+        $body = 'x' * (600 * 1024)
+        foreach ($index in 1..3) {
+            & $script:WriteEml (Join-Path $largeSource "large-$index.eml") "Large message $index" $body "large-$index@example.test"
+        }
+        $largePst = Join-Path $TestDrive 'large-source.pst'
+        ConvertTo-MailPst $largeSource $largePst -SkipVerification -ErrorAction Stop | Out-Null
+
+        $splitBase = Join-Path $TestDrive 'large-split.pst'
+        $report = ConvertTo-MailPst $largePst $splitBase -SplitSizeMB 1 -ErrorAction Stop
+
+        $report.GetType().FullName | Should -Be 'OfficeIMO.Email.Store.EmailStorePstSplitReport'
+        $report.IsSuccessful | Should -BeTrue
+        $report.WrittenItems | Should -Be 3
+        @($report.Parts).Count | Should -Be 3
+        $total = 0
+        foreach ($number in 1..3) {
+            $partPath = Join-Path $TestDrive ('large-split.part{0:D3}.pst' -f $number)
+            $partPath | Should -Exist
+            $part = Import-MailData $partPath -ErrorAction Stop
+            try {
+                $total += @($part | Get-MailStoreItem -MaxItems 10).Count
+            } finally {
+                $part | Close-MailData
+            }
+        }
+        $total | Should -Be 3
     }
 
     It 'opens PST data through the unified owner and exposes folders and references' {
@@ -205,10 +237,12 @@ Describe 'OfficeIMO.Email mail-store workflows' {
 
         Export-MailStore -InputObject $script:data -OutputPath $exportPath -Format Eml -WhatIf
         ConvertTo-MailPst $script:pstOne $conversionPath -WhatIf
+        ConvertTo-MailPst $script:pstOne $conversionPath -SplitSizeMB 1 -WhatIf
         Merge-MailStore $script:pstOne, $script:pstTwo $mergePath -WhatIf
 
         $exportPath | Should -Not -Exist
         $conversionPath | Should -Not -Exist
+        Join-Path $TestDrive 'whatif-conversion.part001.pst' | Should -Not -Exist
         $mergePath | Should -Not -Exist
     }
 

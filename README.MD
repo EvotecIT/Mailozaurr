@@ -293,6 +293,23 @@ ConvertTo-MailPst './offline.ost' './portable.pst'
 Merge-MailStore './old.pst','./portable.pst' './combined.pst'
 ```
 
+Add `-SplitSizeMB` to write numbered parts (`portable.part001.pst`, `portable.part002.pst`, ...) instead of one large file. Each part is verified against the source before it is committed:
+
+```powershell
+ConvertTo-MailPst './archive.pst' './portable.pst' -SplitSizeMB 2048
+```
+
+### Export an Exchange Online mailbox to PST
+
+`Export-GraphMailboxToPst` reads a mailbox through Microsoft Graph and streams each message straight into a new Unicode PST, keeping the folder hierarchy. Nothing is staged on disk, and the mailbox is only read:
+
+```powershell
+Connect-EmailGraph -ClientId $clientId -CertificatePath './app.pfx' -CertificatePassword $pfxPassword -DirectoryId $tenantId
+Export-GraphMailboxToPst -Identity 'user@contoso.com' -OutputPath 'C:\Export' -SplitSizeMB 5120 -IncludeContacts -IncludeCalendar -IncludeTasks
+```
+
+The report lists items written, skipped and failed, and the size and SHA-256 hash of every part. `-IncludeFolder`, `-ExcludeFolder`, `-StartDate` and `-EndDate` narrow the export. An interrupted export continues from its checkpoint when you run the same command with `-Resume`. Mail is always exported; contacts, calendar events and Microsoft To Do tasks are written as typed Outlook items when you ask for them. Recurring events keep their pattern, but modified or cancelled occurrences of a series are not carried and are listed in the report. `Get-Help Export-GraphMailboxToPst -Full` lists the Graph permissions each option needs.
+
 Both write commands accept `-StoreReaderOptions` for custom safety bounds and password-protected PST input. `Merge-MailStore` accepts one shared options object or one object per input path, so archives with different passwords or limits remain explicit.
 
 Use `-Flatten` for directory exports when preserving a deep archive hierarchy would exceed the host's path limit, especially under Windows PowerShell 5.1.
